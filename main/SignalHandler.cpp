@@ -416,9 +416,66 @@ void signal_handler(int sig_num
 #endif
 		g_bStopApplication = true;
 		break;
+	case SIGABRT:
+#if defined(__linux__)
+#if defined(__GLIBC__)
+		pthread_getname_np(pthread_self(), thread_name, sizeof(thread_name));
+#endif
+		tid = syscall(__NR_gettid);
+#endif
+		if (fatal_handling) {
+#if defined(__GLIBC__)
+			_log.Log(LOG_ERROR, "Domoticz(pid:%d, tid:%ld('%s')) received fatal signal %d (%s) while backtracing", getpid(), tid, thread_name, sig_num
+#else
+			_log.Log(LOG_ERROR, "Domoticz(pid:%d, tid:%ld) received fatal signal %d (%s) while backtracing", getpid(), tid, sig_num
+#endif
+#ifndef WIN32
+				, strsignal(sig_num));
+#else
+				, "-");
+#endif
+#if defined(__linux__)
+			printRegInfo(info, ((ucontext_t *)ucontext));
+#endif
+#ifndef WIN32
+			if (!pthread_equal(fatal_handling_thread, pthread_self()))
+			{
+				// fatal error in other thread, wait for dump handler to finish
+				// If using WSL, may be caused by https://github.com/Microsoft/WSL/issues/1731 (Fixed in Windows 10 build 17728)
+				// TODO: Replace sleep with read from FIFO
+				sleep(120);
+			}
+#endif
+			dumpstack_backtrace(info, ucontext);
+			// re-raise signal to enforce core dump
+			signal(sig_num, SIG_DFL);
+			raise(sig_num);
+		}
+		fatal_handling = 1;
+#ifndef WIN32
+		fatal_handling_thread = pthread_self();
+#endif
+		_log.Log(LOG_ERROR, "Domoticz(pid:%d, tid:%ld('%s')) received fatal signal %d (%s)", getpid(), tid, thread_name, sig_num
+#ifndef WIN32
+			, strsignal(sig_num));
+#else
+			, "-");
+#endif
+#if defined(__linux__)
+		printRegInfo(info, ((ucontext_t *)ucontext));
+#endif
+		if (g_bStopApplication)
+		{
+			_log.Log(LOG_ERROR, "Domoticz received abort signal - Give main thread a few seconds to shut down");
+			sleep_seconds(30);
+		}	
+		dumpstack(info, ucontext);
+		// re-raise signal to enforce core dump
+		signal(sig_num, SIG_DFL);
+		raise(sig_num);
+		break;
 	case SIGSEGV:
 	case SIGILL:
-	case SIGABRT:
 	case SIGFPE:
 #if defined(__linux__)
 #if defined(__GLIBC__)
