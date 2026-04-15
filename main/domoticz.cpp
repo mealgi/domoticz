@@ -174,6 +174,7 @@ bool g_bUseWatchdog = true;
 #define PID_FILE "/var/run/domoticz.pid" 
 
 std::string daemonname = DAEMON_NAME;
+std::string m_sz_std_out_err_log_file="";
 std::string pidfile = PID_FILE;
 std::string m_sz_std_out_err_log_file="";
 int pidFilehandle = 0;
@@ -635,6 +636,9 @@ bool ParseConfigFile(const std::string &szConfigFile)
 		else if (szFlag == "userdata_path") {
 			szUserDataFolder = sLine;
 			FixFolderEnding(szUserDataFolder);
+		}
+		else if (szFlag == "std_out_err_log_file") {	
+			m_sz_std_out_err_log_file = sLine;
 		}
 		else if (szFlag == "daemon_name") {
 			daemonname = sLine;
